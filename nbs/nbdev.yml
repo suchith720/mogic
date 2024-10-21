@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "mogic"
+  site-url: "https://suchith720.github.io/mogic"
+  description: "METADATA-INFUSED ORACLE GUIDANCE FOR IMPROVED EXTREME CLASSIFICATION"
+  repo-branch: main
+  repo-url: "https://github.com/suchith720/mogic"

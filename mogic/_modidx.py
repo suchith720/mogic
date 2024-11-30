@@ -6,4 +6,6 @@ d = { 'settings': { 'branch': 'main',
                 'git_url': 'https://github.com/suchith720/mogic',
                 'lib_path': 'mogic'},
   'syms': { 'mogic.00_oak-for-wikiseealsotitles-random-metadata-param': {},
+            'mogic.00_oak-for-wikiseealsotitles-trained-with-linker-predictions': {},
+            'mogic.01_oak-for-wikiseealsotitles-metadata-tokens': {},
             'mogic.core': {'mogic.core.foo': ('core.html#foo', 'mogic/core.py')}}}

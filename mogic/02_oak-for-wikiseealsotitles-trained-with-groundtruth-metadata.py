@@ -4,7 +4,7 @@
 __all__ = []
 
 # %% ../nbs/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.ipynb 2
-import os,torch, torch.multiprocessing as mp, pickle, numpy as np, math
+import os,torch, torch.multiprocessing as mp, pickle, numpy as np, math, transformers
 from transformers import DistilBertConfig
 
 from xcai.basics import *
@@ -20,7 +20,36 @@ from fastcore.utils import *
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 os.environ['WANDB_PROJECT']='oakVn_00-wikiseealsotitles'
 
-# %% ../nbs/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.ipynb 7
+# %% ../nbs/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.ipynb 6
+@patch
+def create_optimizer_and_scheduler(self:XCLearner, num_training_steps: int):
+    NO_DECAY = ['bias', 'LayerNorm.weight']
+
+    dense, sparse = [], []
+    for k, p in model.named_parameters():
+        if p.requires_grad:
+            if "meta_embeddings" not in k: dense.append((k,p))
+            else: sparse.append(p)
+
+    params = [
+        {'params': [p for n, p in dense if not any(nd in n for nd in NO_DECAY)], 'weight_decay': 0.01},
+        {'params': [p for n, p in dense if any(nd in n for nd in NO_DECAY)], 'weight_decay': 0.0},
+    ]
+
+    optimizer_list = [torch.optim.AdamW(params, **{'lr': self.args.learning_rate, 'eps': 1e-6}),
+                      torch.optim.SparseAdam(sparse, **{'lr': self.args.learning_rate * self.args.free_parameter_lr_coefficient, 'eps': 1e-6})]
+
+    self.optimizer = MultipleOptimizer(optimizer_list)
+    scheduler_list = [transformers.get_linear_schedule_with_warmup(self.optimizer.optimizers[0], num_warmup_steps=self.args.warmup_steps,
+                                                                   num_training_steps=num_training_steps),
+                        transformers.get_cosine_schedule_with_warmup(self.optimizer.optimizers[1],
+                                                                     num_warmup_steps=self.args.free_parameter_warmup_steps,
+                                                                     num_training_steps=num_training_steps)]
+
+    self.lr_scheduler = MultipleScheduler(scheduler_list)
+    
+
+# %% ../nbs/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.ipynb 8
 if __name__ == '__main__':
     build_block = True
     pkl_dir = '/home/scai/phd/aiz218323/scratch/datasets/'
@@ -40,17 +69,25 @@ if __name__ == '__main__':
     else:
         with open(pkl_file, 'rb') as file: block = pickle.load(file)
     
-    """ Prune metadata """
+    """ Uses ground truth during training and linker prediction during inference """
+    block.train.dset.meta['hyb'] = MetaXCDataset('hyb', block.train.dset.meta['cat_meta'].data_meta, 
+                                                 block.train.dset.meta['cat_meta'].lbl_meta, block.train.dset.meta['cat_meta'].meta_info)
+    
     data_meta = retain_topk(block.test.dset.meta['lnk_meta'].data_meta, k=3)
     lbl_meta = block.test.dset.meta['lnk_meta'].lbl_meta
-
-    MetaXCDataset()
-
+    block.test.dset.meta['hyb'] = MetaXCDataset('hyb', data_meta, lbl_meta, block.test.dset.meta['lnk_meta'].meta_info)
+    
     block.collator.tfms.tfms[0].sampling_features = [('lbl2data',4),('hyb2data',3)]
     block.collator.tfms.tfms[0].oversample = False
-    
-    block.train.dset.meta['lnk_meta'].meta_info = None
-    block.test.dset.meta['lnk_meta'].meta_info = None
+
+    del block.train.dset.meta['lnk_meta']
+    del block.test.dset.meta['lnk_meta']
+
+    del block.train.dset.meta['cat_meta']
+    del block.test.dset.meta['cat_meta']
+
+    block.train.dset.meta['hyb_meta'].meta_info = None
+    block.test.dset.meta['hyb_meta'].meta_info = None
 
     """ Training arguements """
     args = XCLearningArguments(
@@ -99,21 +136,21 @@ if __name__ == '__main__':
         max_grad_norm=None, 
         fp16=True,
         
-        label_names=['lbl2data_idx', 'lbl2data_input_ids', 'lbl2data_attention_mask', 'lnk2data_idx'],
+        label_names=['lbl2data_idx', 'lbl2data_input_ids', 'lbl2data_attention_mask', 'hyb2data_idx'],
         
         prune_metadata=False,
         num_metadata_prune_warmup_epochs=10,
         num_metadata_prune_epochs=5,
         metadata_prune_batch_size=2048,
-        prune_metadata_names=['lnk_meta'],
+        prune_metadata_names=['hyb_meta'],
         use_data_metadata_for_pruning=True,
     
         predict_with_augmentation=False,
         use_augmentation_index_representation=True,
     
-        data_aug_meta_name='lnk',
+        data_aug_meta_name='hyb',
         augmentation_num_beams=None,
-        data_aug_prefix='lnk',
+        data_aug_prefix='hyb',
         use_label_metadata=False,
         
         data_meta_batch_size=2048,
@@ -130,10 +167,10 @@ if __name__ == '__main__':
     model = OAK001.from_pretrained('sentence-transformers/msmarco-distilbert-base-v4', batch_size=bsz, num_batch_labels=5000, 
                                    margin=0.3, num_negatives=10, tau=0.1, apply_softmax=True,
                                
-                                   data_aug_meta_prefix='lnk2data', lbl2data_aug_meta_prefix=None, 
+                                   data_aug_meta_prefix='hyb2data', lbl2data_aug_meta_prefix=None, 
                                    data_pred_meta_prefix=None, lbl2data_pred_meta_prefix=None,
                                    
-                                   num_metadata=block.train.dset.meta['lnk_meta'].n_meta, resize_length=5000,
+                                   num_metadata=block.train.dset.meta['hyb_meta'].n_meta, resize_length=5000,
                                    
                                    calib_margin=0.05, calib_num_negatives=10, calib_tau=0.1, calib_apply_softmax=False, 
                                    calib_loss_weight=0.1, use_calib_loss=False,

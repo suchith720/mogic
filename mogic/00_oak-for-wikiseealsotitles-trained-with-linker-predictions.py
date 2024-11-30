@@ -4,7 +4,7 @@
 __all__ = []
 
 # %% ../nbs/00_oak-for-wikiseealsotitles-trained-with-linker-predictions.ipynb 2
-import os,torch, torch.multiprocessing as mp, pickle, numpy as np, math
+import os,torch, torch.multiprocessing as mp, pickle, numpy as np, math, transformers
 from transformers import DistilBertConfig
 
 from xcai.basics import *

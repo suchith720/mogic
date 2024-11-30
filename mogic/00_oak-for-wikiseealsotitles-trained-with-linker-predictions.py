@@ -19,13 +19,13 @@ from fastcore.utils import *
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 os.environ['WANDB_PROJECT']='oakVn_00-wikiseealsotitles'
 
-# %% ../nbs/00_oak-for-wikiseealsotitles-trained-with-linker-predictions.ipynb 12
+# %% ../nbs/00_oak-for-wikiseealsotitles-trained-with-linker-predictions.ipynb 6
 if __name__ == '__main__':
-    build_block = False
+    build_block = True
     pkl_dir = '/home/scai/phd/aiz218323/scratch/datasets/'
     data_dir = '/home/scai/phd/aiz218323/Projects/XC_NLG/data'
     
-    output_dir = '/home/scai/phd/aiz218323/scratch/outputs/mogic/00_oak-for-wikiseealsotitles-random-metadata-param'
+    output_dir = '/home/scai/phd/aiz218323/scratch/outputs/mogic/00_oak-for-wikiseealsotitles-trained-with-linker-predictions'
     meta_embed_file = '/home/aiscuser/scratch/OGB_Weights/LF-WikiSeeAlsoTitles-320K/emb_weights.npy'
 
     """ Load data """
@@ -38,31 +38,21 @@ if __name__ == '__main__':
         exit()
     else:
         with open(pkl_file, 'rb') as file: block = pickle.load(file)
-
-    """ Sampling metadata """
-    n_meta = block.train.dset.meta.lnk_meta.n_meta
-    meta_idx = np.random.permutation(n_meta)[:math.ceil(n_meta/n_factor)]
-    block.train.dset.meta['lnk_meta'] = block.train.dset.meta['lnk_meta']._sample_meta_items(meta_idx)
-    block.test.dset.meta['lnk_meta'] = block.test.dset.meta['lnk_meta']._sample_meta_items(meta_idx)
-
-    #meta_embeddings = torch.tensor(np.load(meta_embed_file), dtype=torch.float32)
-    assert meta_embeddings.size(0) == n_meta, f'loaded embeddings should have {n_meta} metadata'
-    meta_embeddings = meta_embeddings[meta_idx]
     
     """ Prune metadata """
-    data_meta = retain_topk(block.train.dset.meta.lnk_meta.data_meta, k=5)
-    lbl_meta = block.train.dset.meta.lnk_meta.lbl_meta
-    block.train.dset.meta.lnk_meta.update_meta_matrix(data_meta, lbl_meta)
+    data_meta = retain_topk(block.train.dset.meta['lnk_meta'].data_meta, k=5)
+    lbl_meta = block.train.dset.meta['lnk_meta'].lbl_meta
+    block.train.dset.meta['lnk_meta'].update_meta_matrix(data_meta, lbl_meta)
     
-    data_meta = retain_topk(block.test.dset.meta.lnk_meta.data_meta, k=3)
-    lbl_meta = block.test.dset.meta.lnk_meta.lbl_meta
-    block.test.dset.meta.lnk_meta.update_meta_matrix(data_meta, lbl_meta)
+    data_meta = retain_topk(block.test.dset.meta['lnk_meta'].data_meta, k=3)
+    lbl_meta = block.test.dset.meta['lnk_meta'].lbl_meta
+    block.test.dset.meta['lnk_meta'].update_meta_matrix(data_meta, lbl_meta)
 
     block.collator.tfms.tfms[0].sampling_features = [('lbl2data',4),('lnk2data',3)]
     block.collator.tfms.tfms[0].oversample = False
     
-    block.train.dset.meta.lnk_meta.meta_info = None
-    block.test.dset.meta.lnk_meta.meta_info = None
+    block.train.dset.meta['lnk_meta'].meta_info = None
+    block.test.dset.meta['lnk_meta'].meta_info = None
 
     """ Training arguements """
     args = XCLearningArguments(
@@ -134,12 +124,12 @@ if __name__ == '__main__':
         num_metadata_augment_epochs=5,
     
         use_cpu_for_searching=False,
-        use_cpu_for_clustering=False,
+        use_cpu_for_clustering=True,
     )
 
     """ model """
     bsz = max(args.per_device_train_batch_size, args.per_device_eval_batch_size)*torch.cuda.device_count()
-    model = OAK003.from_pretrained('sentence-transformers/msmarco-distilbert-base-v4', batch_size=bsz, num_batch_labels=5000, 
+    model = OAK001.from_pretrained('sentence-transformers/msmarco-distilbert-base-v4', batch_size=bsz, num_batch_labels=5000, 
                                    margin=0.3, num_negatives=10, tau=0.1, apply_softmax=True,
                                
                                    data_aug_meta_prefix='lnk2data', lbl2data_aug_meta_prefix=None, 
@@ -162,10 +152,9 @@ if __name__ == '__main__':
     model.init_cross_head()
     model.init_meta_embeddings()
     
-    # model.encoder.set_pretrained_meta_embeddings(torch.tensor(meta_embeddings, dtype=torch.float32))
-    model.encoder.set_pretrained_meta_embeddings(torch.zeros(block.train.dset.meta['lnk_meta'].n_meta, model.config.dim))
+    meta_embeddings = np.load(meta_embed_file)
+    model.encoder.set_pretrained_meta_embeddings(torch.tensor(meta_embeddings, dtype=torch.float32))
     model.encoder.freeze_pretrained_meta_embeddings()
-    
     
     """ Training """
     metric = PrecRecl(block.n_lbl, block.test.data_lbl_filterer, prop=block.train.dset.data.data_lbl,

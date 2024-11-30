@@ -20,7 +20,7 @@ from fastcore.utils import *
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 os.environ['WANDB_PROJECT']='oakVn_00-wikiseealsotitles'
 
-# %% ../nbs/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.ipynb 6
+# %% ../nbs/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.ipynb 7
 if __name__ == '__main__':
     build_block = True
     pkl_dir = '/home/scai/phd/aiz218323/scratch/datasets/'

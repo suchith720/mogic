@@ -10,6 +10,6 @@ d = { 'settings': { 'branch': 'main',
             'mogic.01_oak-for-wikiseealsotitles-metadata-tokens': {},
             'mogic.02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata': { 'mogic.02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.XCLearner.create_optimizer_and_scheduler': ( 'oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.html#xclearner.create_optimizer_and_scheduler',
                                                                                                                                                                                                          'mogic/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.py')},
-            'mogic.03_benchmarking_nvembed_bm25': { 'mogic.03_benchmarking_nvembed_bm25.prompt_func': ( 'benchmarking-nvembed.html#prompt_func',
-                                                                                                        'mogic/03_benchmarking_nvembed_bm25.py')},
+            'mogic.03_benchmarking-nvembed': { 'mogic.03_benchmarking-nvembed.prompt_func': ( 'benchmarking-nvembed.html#prompt_func',
+                                                                                              'mogic/03_benchmarking-nvembed.py')},
             'mogic.core': {'mogic.core.foo': ('core.html#foo', 'mogic/core.py')}}}

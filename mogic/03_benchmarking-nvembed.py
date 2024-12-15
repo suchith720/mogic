@@ -18,12 +18,12 @@ from fastcore.utils import *
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 os.environ['WANDB_PROJECT']='oakVn_00-wikiseealsotitles'
 
-# %% ../nbs/03_benchmarking-nvembed.ipynb 34
+# %% ../nbs/03_benchmarking-nvembed.ipynb 33
 def prompt_func(x):
     return f'''Instruct: Given the title of a wikipedia article, your task is to predict the titles of all articles which are \
 likely to be listed in the see also section of the mentioned article.\nQuery: {x}'''
 
-# %% ../nbs/03_benchmarking-nvembed.ipynb 35
+# %% ../nbs/03_benchmarking-nvembed.ipynb 34
 if __name__ == '__main__':
     build_block = True
     pkl_dir = '/home/scai/phd/aiz218323/scratch/datasets/'
@@ -37,7 +37,9 @@ if __name__ == '__main__':
     if build_block:
         block = XCBlock.from_cfg(data_dir, 'data', transform_type='xcs', tokenizer='nvidia/NV-Embed-v2', 
                                  sampling_features=[('lbl2data',1)], max_sequence_length=64, oversample=False)
-
+        
+        tokenizer = AutoTokenizer.from_pretrained('nvidia/NV-Embed-v2')
+        
         input_text = [prompt_func(o) for o in block.train.dset.data.data_info['input_text']]
         tokenized_text = tokenizer.batch_encode_plus(input_text, truncation=True, max_length=64)
         block.train.dset.data.data_info.update(tokenized_text)

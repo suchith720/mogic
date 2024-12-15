@@ -12,4 +12,8 @@ d = { 'settings': { 'branch': 'main',
                                                                                                                                                                                                          'mogic/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.py')},
             'mogic.03_benchmarking-nvembed': { 'mogic.03_benchmarking-nvembed.prompt_func': ( 'benchmarking-nvembed.html#prompt_func',
                                                                                               'mogic/03_benchmarking-nvembed.py')},
+            'mogic.09_oak-for-wikiseealsotitles-trained-with-metadata-dexa': { 'mogic.09_oak-for-wikiseealsotitles-trained-with-metadata-dexa.XCLearner.create_optimizer_and_scheduler': ( 'oak-for-wikiseealsotitles-trained-with-metadata-dexa.html#xclearner.create_optimizer_and_scheduler',
+                                                                                                                                                                                           'mogic/09_oak-for-wikiseealsotitles-trained-with-metadata-dexa.py'),
+                                                                               'mogic.09_oak-for-wikiseealsotitles-trained-with-metadata-dexa.get_meta_cluster_mapping': ( 'oak-for-wikiseealsotitles-trained-with-metadata-dexa.html#get_meta_cluster_mapping',
+                                                                                                                                                                           'mogic/09_oak-for-wikiseealsotitles-trained-with-metadata-dexa.py')},
             'mogic.core': {'mogic.core.foo': ('core.html#foo', 'mogic/core.py')}}}

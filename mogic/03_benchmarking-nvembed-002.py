@@ -9,37 +9,55 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModel
 
 from xcai.basics import *
+from xcai.models.NVM0XX import NVM009
 
 from xclib.utils.sparse import retain_topk
 
 from fastcore.utils import *
 
 # %% ../nbs/03_benchmarking-nvembed.ipynb 4
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2,3,4,5'
 os.environ['WANDB_PROJECT']='oakVn_00-wikiseealsotitles'
+os.environ['WANDB_MODE'] = 'disabled'
 
-# %% ../nbs/03_benchmarking-nvembed.ipynb 33
+from scipy import sparse
+from tqdm.auto import tqdm
+from typing import List
+
+@patch
+def augment(self:AugmentMetaInputIdsTfm, data_ids:List, data_meta:sparse.csr_matrix, meta_ids:List):
+    meta2data_ids = []
+    for d_ids, d_meta in tqdm(zip(data_ids, data_meta), total=len(data_ids)):
+        m2d_ids, sep_tok = d_ids[:-1].copy() if self.exclude_sep else d_ids.copy(), d_ids[-1:]
+        for o in d_meta.indices[np.random.permutation(len(d_meta.indices))]:
+            if self.exclude_sep: m2d_ids.extend(meta_ids[o][1:-1])
+            else: m2d_ids.extend(meta_ids[o][1:])
+            if self.max_len is not None and len(m2d_ids)>=self.max_len: m2d_ids = m2d_ids[:self.max_len]; break
+        meta2data_ids.append(m2d_ids)
+    return meta2data_ids
+
+# %% ../nbs/03_benchmarking-nvembed.ipynb 34
 def prompt_func(x):
     return f'''Instruct: Given the title of a wikipedia article, your task is to predict the titles of all articles which are \
 likely to be listed in the see also section of the mentioned article.\nQuery: {x}'''
 
-# %% ../nbs/03_benchmarking-nvembed.ipynb 34
+# %% ../nbs/03_benchmarking-nvembed.ipynb 35
 if __name__ == '__main__':
-    build_block = True
-    pkl_dir = '/home/scai/phd/aiz218323/scratch/datasets/'
-    data_dir = '/home/scai/phd/aiz218323/Projects/XC_NLG/data'
+    build_block = False
+    pkl_dir = '/home/aiscuser/scratch1/datasets/'
+    data_dir = '/data/datasets/'
     
-    output_dir = '/home/scai/phd/aiz218323/scratch/outputs/mogic/03_benchmarking_nvembed_bm25'
+    output_dir = '/home/aiscuser/scratch1/outputs/mogic/03_benchmarking-nvembed-002'
 
     """ Load data """
-    pkl_file = f'{pkl_dir}/processed/wikiseealsotitles_data_nv-embed-v2_xcs.pkl'
+    pkl_file = f'{pkl_dir}/processed/wikiseealsotitles_data-meta_nv-embed-v2_xcs_cat-128.pkl'
 
     if build_block:
-        block = XCBlock.from_cfg(data_dir, 'data', transform_type='xcs', tokenizer='nvidia/NV-Embed-v2', 
-                                 sampling_features=[('lbl2data',1)], max_sequence_length=64, oversample=False)
-        
+        block = XCBlock.from_cfg(data_dir, 'data_meta', transform_type='xcs', tokenizer='nvidia/NV-Embed-v2', 
+                                 sampling_features=[('lbl2data',1)], max_sequence_length=16, oversample=False)
+
         tokenizer = AutoTokenizer.from_pretrained('nvidia/NV-Embed-v2')
-        
+
         input_text = [prompt_func(o) for o in block.train.dset.data.data_info['input_text']]
         tokenized_text = tokenizer.batch_encode_plus(input_text, truncation=True, max_length=64)
         block.train.dset.data.data_info.update(tokenized_text)
@@ -48,18 +66,33 @@ if __name__ == '__main__':
         tokenized_text = tokenizer.batch_encode_plus(input_text, truncation=True, max_length=64)
         block.test.dset.data.data_info.update(tokenized_text)
 
+        block = AugmentMetaInputIdsTfm.apply(block, 'cat_meta', 'data', 128, False)
+        block = AugmentMetaInputIdsTfm.apply(block, 'cat_meta', 'lbl', 128, False)
+
         with open(pkl_file, 'wb') as file: pickle.dump(block, file)
         exit()
     else:
         with open(pkl_file, 'rb') as file: block = pickle.load(file)
-    
+
+    block.train.dset.data.data_info['input_ids'] = block.train.dset.data.data_info['input_ids_aug_cat']
+    block.train.dset.data.data_info['attention_mask'] = block.train.dset.data.data_info['attention_mask_aug_cat']
+    block.test.dset.data.data_info['input_ids'] = block.test.dset.data.data_info['input_ids_aug_cat']
+    block.test.dset.data.data_info['attention_mask'] = block.test.dset.data.data_info['attention_mask_aug_cat']
+
+    block.train.dset.data.lbl_info['input_ids'] = block.train.dset.data.lbl_info['input_ids_aug_cat']
+    block.train.dset.data.lbl_info['attention_mask'] = block.train.dset.data.lbl_info['attention_mask_aug_cat']
+    block.test.dset.data.lbl_info['input_ids'] = block.test.dset.data.lbl_info['input_ids_aug_cat']
+    block.test.dset.data.lbl_info['attention_mask'] = block.test.dset.data.lbl_info['attention_mask_aug_cat']
+
+    block.train.dset.meta = {}
+    block.test.dset.meta = {}
 
     """ Training arguements """
     args = XCLearningArguments(
         output_dir=output_dir,
         logging_first_step=True,
-        per_device_train_batch_size=800,
-        per_device_eval_batch_size=800,
+        per_device_train_batch_size=25,
+        per_device_eval_batch_size=25,
         representation_num_beams=200,
         representation_accumulation_steps=10,
         save_strategy="steps",
@@ -113,8 +146,9 @@ if __name__ == '__main__':
     """ model """
     bsz = max(args.per_device_train_batch_size, args.per_device_eval_batch_size)*torch.cuda.device_count()
     model = NVM009.from_pretrained('nvidia/NV-Embed-v2', bsz=bsz, margin=0.3, tau=0.1, n_negatives=10, apply_softmax=True, 
-                                   use_encoder_parallel=False)
+                                   use_encoder_parallel=True)
     
+    model.encoder.dr_head.activation = torch.nn.Identity()
     model.init_dr_head()
     
     """ Training """
@@ -130,6 +164,7 @@ if __name__ == '__main__':
         compute_metrics=metric,
     )
     
-    mp.freeze_support()
-    learn.train()
-    
+    # mp.freeze_support()
+    # learn.train()
+
+    print(learn.evaluate())

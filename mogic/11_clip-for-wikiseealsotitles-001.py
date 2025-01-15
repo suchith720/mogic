@@ -18,8 +18,9 @@ from xclib.utils.sparse import retain_topk
 from fastcore.utils import *
 
 # %% ../nbs/11_clip-for-wikiseealsotitles.ipynb 4
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
 os.environ['WANDB_PROJECT']='oakI_00-wikiseealsotitles'
+os.environ['WANDB_MODE'] = 'disabled' 
 
 # %% ../nbs/11_clip-for-wikiseealsotitles.ipynb 8
 class CLIP001(CLIPTextModel):
@@ -84,11 +85,11 @@ class CLIP001(CLIPTextModel):
 
 # %% ../nbs/11_clip-for-wikiseealsotitles.ipynb 13
 if __name__ == '__main__':
-    build_block = True
-    pkl_dir = '/home/scai/phd/aiz218323/scratch/datasets/'
-    data_dir = '/home/scai/phd/aiz218323/Projects/XC_NLG/data'
+    build_block = False
+    pkl_dir = '/home/aiscuser/scratch1/datasets/'
+    data_dir = '/data/datasets/'
     
-    output_dir = '/home/scai/phd/aiz218323/scratch/outputs/mogic/11_clip-for-wikiseealsotitles'
+    output_dir = '/home/aiscuser/scratch1/outputs/mogic/11_clip-for-wikiseealsotitles-001'
     
     """ Load data """
     pkl_file = f'{pkl_dir}/processed/wikiseealsotitles_data_openai-clip-vit-base-patch32_xcs.pkl'
@@ -179,8 +180,8 @@ if __name__ == '__main__':
 
     """ model """
     bsz = max(args.per_device_train_batch_size, args.per_device_eval_batch_size)*torch.cuda.device_count()
-    model = CLIP001.from_pretrained('sentence-transformers/msmarco-distilbert-base-v4', batch_size=100, num_batch_labels=5000, 
-                                    margin=0.3, num_negatives=10, tau=0.1, apply_softmax=True)
+    model = CLIP001.from_pretrained("openai/clip-vit-base-patch32", batch_size=100, num_batch_labels=5000, margin=0.3, 
+            num_negatives=10, tau=0.1, apply_softmax=True)
     
     """ Training """
     metric = PrecRecl(block.n_lbl, block.test.data_lbl_filterer, prop=block.train.dset.data.data_lbl,

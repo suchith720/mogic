@@ -18,11 +18,25 @@ from xclib.utils.sparse import retain_topk
 from fastcore.utils import *
 
 # %% ../nbs/11_clip-for-wikiseealsotitles.ipynb 4
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
-os.environ['WANDB_PROJECT']='oakI_00-wikiseealsotitles'
+os.environ['CUDA_VISIBLE_DEVICES'] = '13'
+os.environ['WANDB_PROJECT']='oakVn_01-amazontitles131'
+
+from transformers.trainer_utils import RemoveColumnsCollator
+from transformers import BatchEncoding
+
+@patch
+def __call__(self:RemoveColumnsCollator, features):
+    if isinstance(features, list):
+        features = [self._remove_columns(feature) for feature in features]
+    elif isinstance(features, dict) or isinstance(features, BatchEncoding):
+        features = self._remove_columns(features)
+    else:
+        raise ValueError(f'Invalid input type: {type(features)}')
+    return self.data_collator(features)
 
 # %% ../nbs/11_clip-for-wikiseealsotitles.ipynb 8
 class CLIP001(CLIPTextModel):
+    use_generation,use_representation = False,True
 
     def __init__(
         self, 
@@ -84,32 +98,32 @@ class CLIP001(CLIPTextModel):
 
 # %% ../nbs/11_clip-for-wikiseealsotitles.ipynb 13
 if __name__ == '__main__':
-    build_block = True
-    pkl_dir = '/home/scai/phd/aiz218323/scratch/datasets/'
-    data_dir = '/home/scai/phd/aiz218323/Projects/XC_NLG/data'
+    build_block = False
+    data_dir = '/data/From_B/'
+    pkl_dir = '/home/aiscuser/scratch1/datasets/'
     
-    output_dir = '/home/scai/phd/aiz218323/scratch/outputs/mogic/11_clip-for-wikiseealsotitles'
+    output_dir = '/home/aiscuser/scratch1/outputs/mogic/12_clip-text-for-amazontitles-001'
     
     """ Load data """
-    pkl_file = f'{pkl_dir}/processed/wikiseealsotitles_data_openai-clip-vit-base-patch32_xcs.pkl'
+    pkl_file = f'{pkl_dir}/processed/amazontitles131_data_openai-clip-vit-base-patch32_sxc.pkl'
 
     if build_block:
-        block = XCBlock.from_cfg(data_dir, 'data', transform_type='xcs', tokenizer='openai/clip-vit-base-patch32', 
-                                 sampling_features=[('lbl2data',1)], oversample=False)
+        block = SXCBlock.from_cfg(data_dir, 'data', dset='amazontitles131', tokenizer='openai/clip-vit-base-patch32', padding=True, return_tensors='pt', 
+                max_sequence_length=32, n_slbl_samples=1, main_oversample=False)
         with open(pkl_file, 'wb') as file: pickle.dump(block, file)
         exit()
     else:
         with open(pkl_file, 'rb') as file: block = pickle.load(file)
 
-    block.collator.tfms.tfms[0].sampling_features = [('lbl2data',1)]
-    block.collator.tfms.tfms[0].oversample = False
+    block.train.dset.data.n_slbl_samples = 1
+    block.train.dset.data.main_oversample = False
 
     """ Training arguements """
     args = XCLearningArguments(
         output_dir=output_dir,
         logging_first_step=True,
-        per_device_train_batch_size=800,
-        per_device_eval_batch_size=800,
+        per_device_train_batch_size=1600,
+        per_device_eval_batch_size=1600,
         representation_num_beams=200,
         representation_accumulation_steps=10,
         save_strategy="steps",
@@ -173,14 +187,14 @@ if __name__ == '__main__':
         num_metadata_augment_warmup_epochs=10,
         num_metadata_augment_epochs=5,
     
-        use_cpu_for_searching=False,
+        use_cpu_for_searching=True,
         use_cpu_for_clustering=True,
     )
 
     """ model """
     bsz = max(args.per_device_train_batch_size, args.per_device_eval_batch_size)*torch.cuda.device_count()
-    model = CLIP001.from_pretrained('sentence-transformers/msmarco-distilbert-base-v4', batch_size=100, num_batch_labels=5000, 
-                                    margin=0.3, num_negatives=10, tau=0.1, apply_softmax=True)
+    model = CLIP001.from_pretrained("openai/clip-vit-base-patch32", batch_size=bsz, num_batch_labels=5000, margin=0.3, 
+            num_negatives=10, tau=0.1, apply_softmax=True)
     
     """ Training """
     metric = PrecRecl(block.n_lbl, block.test.data_lbl_filterer, prop=block.train.dset.data.data_lbl,
@@ -194,6 +208,6 @@ if __name__ == '__main__':
         data_collator=block.collator,
         compute_metrics=metric,
     )
-    
-    print(learn.evaluate())
-    
+
+    learn.train()
+

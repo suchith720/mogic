@@ -8,6 +8,7 @@ import os,torch, torch.multiprocessing as mp, pickle, numpy as np, math, transfo
 from transformers import DistilBertConfig
 
 from xcai.basics import *
+from xcai.data import MetaXCDataset
 from xcai.models.oakX import OAK001
 from xcai.optimizers.oakX import MultipleOptimizer, MultipleScheduler
 
@@ -17,7 +18,7 @@ from xclib.utils.sparse import retain_topk
 from fastcore.utils import *
 
 # %% ../nbs/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.ipynb 4
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '4,5'
 os.environ['WANDB_PROJECT']='oakVn_00-wikiseealsotitles'
 
 # %% ../nbs/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.ipynb 6
@@ -51,15 +52,15 @@ def create_optimizer_and_scheduler(self:XCLearner, num_training_steps: int):
 
 # %% ../nbs/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata.ipynb 8
 if __name__ == '__main__':
-    build_block = True
-    pkl_dir = '/home/scai/phd/aiz218323/scratch/datasets/'
-    data_dir = '/home/scai/phd/aiz218323/Projects/XC_NLG/data'
+    build_block = False
+    pkl_dir = '/home/aiscuser/scratch1/datasets/'
+    data_dir = '/data/datasets/'
     
-    output_dir = '/home/scai/phd/aiz218323/scratch/outputs/mogic/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata'
-    meta_embed_file = '/home/aiscuser/scratch/OGB_Weights/LF-WikiSeeAlsoTitles-320K/emb_weights.npy'
+    output_dir = '/home/aiscuser/scratch1/outputs/mogic/02_oak-for-wikiseealsotitles-trained-with-groundtruth-metadata-001'
+    meta_embed_file = '/data/OGB_Weights/LF-WikiSeeAlsoTitles-320K/emb_weights.npy'
 
     """ Load data """
-    pkl_file = f'{pkl_dir}/processed/wikiseealsotitles_data-lnk_distilbert-base-uncased_xcs.pkl'
+    pkl_file = f'{pkl_dir}/processed/wikiseealsotitles_data-cat-lnk_distilbert-base-uncased_xcs.pkl'
 
     if build_block:
         block = XCBlock.from_cfg(data_dir, 'data_cat_lnk', transform_type='xcs', tokenizer='distilbert-base-uncased', 
@@ -70,14 +71,14 @@ if __name__ == '__main__':
         with open(pkl_file, 'rb') as file: block = pickle.load(file)
     
     """ Uses ground truth during training and linker prediction during inference """
-    block.train.dset.meta['hyb'] = MetaXCDataset('hyb', block.train.dset.meta['cat_meta'].data_meta, 
+    block.train.dset.meta['hyb_meta'] = MetaXCDataset('hyb', block.train.dset.meta['cat_meta'].data_meta, 
                                                  block.train.dset.meta['cat_meta'].lbl_meta, block.train.dset.meta['cat_meta'].meta_info)
     
     data_meta = retain_topk(block.test.dset.meta['lnk_meta'].data_meta, k=3)
     lbl_meta = block.test.dset.meta['lnk_meta'].lbl_meta
-    block.test.dset.meta['hyb'] = MetaXCDataset('hyb', data_meta, lbl_meta, block.test.dset.meta['lnk_meta'].meta_info)
+    block.test.dset.meta['hyb_meta'] = MetaXCDataset('hyb', data_meta, lbl_meta, block.test.dset.meta['lnk_meta'].meta_info)
     
-    block.collator.tfms.tfms[0].sampling_features = [('lbl2data',4),('hyb2data',3)]
+    block.collator.tfms.tfms[0].sampling_features = [('lbl2data',1),('hyb2data',3)]
     block.collator.tfms.tfms[0].oversample = False
 
     del block.train.dset.meta['lnk_meta']

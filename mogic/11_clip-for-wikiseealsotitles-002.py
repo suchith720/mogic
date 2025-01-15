@@ -6,23 +6,47 @@ __all__ = ['CLIP001']
 # %% ../nbs/11_clip-for-wikiseealsotitles.ipynb 2
 import os,torch, torch.multiprocessing as mp, pickle, numpy as np, math, transformers
 
-from transformers import CLIPTextModel
+from transformers import CLIPModel
 import torch.nn.functional as F
 
 from xcai.basics import *
 from xcai.models.modeling_utils import *
 from xcai.losses import *
+from xcai.data import MetaXCDataset 
 
 from xclib.utils.sparse import retain_topk
 
 from fastcore.utils import *
 
 # %% ../nbs/11_clip-for-wikiseealsotitles.ipynb 4
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
 os.environ['WANDB_PROJECT']='oakI_00-wikiseealsotitles'
+os.environ['WANDB_MODE'] = 'disabled' 
 
 # %% ../nbs/11_clip-for-wikiseealsotitles.ipynb 8
-class CLIP001(CLIPTextModel):
+class CLIP002Encoder(CLIPModel):
+    
+    def __init__(self, config, *args, **kwargs):
+        super().__init__(config, *args, **kwargs)
+        
+    @delegates(CLIPModel.__call__)
+    def forward(
+        self, 
+        input_ids:Optional[torch.Tensor]=None, 
+        attention_mask:Optional[torch.Tensor]=None,
+        **kwargs
+    ):
+        o = self.distilbert(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            **kwargs
+        )
+        rep = self.dr_transform(o[0])
+        rep = self.dr_layer_norm(rep)
+        rep = self.dr_projector(rep)
+        return o, F.normalize(Pooling.mean_pooling(rep, attention_mask), dim=1)
+
+class CLIP002(CLIPModel):
 
     def __init__(
         self, 
@@ -84,11 +108,11 @@ class CLIP001(CLIPTextModel):
 
 # %% ../nbs/11_clip-for-wikiseealsotitles.ipynb 13
 if __name__ == '__main__':
-    build_block = True
-    pkl_dir = '/home/scai/phd/aiz218323/scratch/datasets/'
-    data_dir = '/home/scai/phd/aiz218323/Projects/XC_NLG/data'
+    build_block = False
+    pkl_dir = '/home/aiscuser/scratch1/datasets/'
+    data_dir = '/data/datasets/'
     
-    output_dir = '/home/scai/phd/aiz218323/scratch/outputs/mogic/11_clip-for-wikiseealsotitles'
+    output_dir = '/home/aiscuser/scratch1/outputs/mogic/11_clip-for-wikiseealsotitles-002'
     
     """ Load data """
     pkl_file = f'{pkl_dir}/processed/wikiseealsotitles_data_openai-clip-vit-base-patch32_xcs.pkl'
@@ -179,8 +203,8 @@ if __name__ == '__main__':
 
     """ model """
     bsz = max(args.per_device_train_batch_size, args.per_device_eval_batch_size)*torch.cuda.device_count()
-    model = CLIP001.from_pretrained('sentence-transformers/msmarco-distilbert-base-v4', batch_size=100, num_batch_labels=5000, 
-                                    margin=0.3, num_negatives=10, tau=0.1, apply_softmax=True)
+    model = CLIP001.from_pretrained("openai/clip-vit-base-patch32", batch_size=100, num_batch_labels=5000, margin=0.3, 
+            num_negatives=10, tau=0.1, apply_softmax=True)
     
     """ Training """
     metric = PrecRecl(block.n_lbl, block.test.data_lbl_filterer, prop=block.train.dset.data.data_lbl,

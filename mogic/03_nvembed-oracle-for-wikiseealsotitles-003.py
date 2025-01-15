@@ -9,27 +9,32 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModel
 
 from xcai.basics import *
+from xcai.models.NVM0XX import NVM009
 
 from xclib.utils.sparse import retain_topk
 
 from fastcore.utils import *
 
+from transformers import BitsAndBytesConfig
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training 
+
 # %% ../nbs/03_benchmarking-nvembed.ipynb 4
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 os.environ['WANDB_PROJECT']='oakVn_00-wikiseealsotitles'
+os.environ['WANDB_MODE'] = 'disabled'
 
-# %% ../nbs/03_benchmarking-nvembed.ipynb 33
+# %% ../nbs/03_benchmarking-nvembed.ipynb 34
 def prompt_func(x):
     return f'''Instruct: Given the title of a wikipedia article, your task is to predict the titles of all articles which are \
 likely to be listed in the see also section of the mentioned article.\nQuery: {x}'''
 
-# %% ../nbs/03_benchmarking-nvembed.ipynb 34
+# %% ../nbs/03_benchmarking-nvembed.ipynb 35
 if __name__ == '__main__':
-    build_block = True
-    pkl_dir = '/home/scai/phd/aiz218323/scratch/datasets/'
-    data_dir = '/home/scai/phd/aiz218323/Projects/XC_NLG/data'
+    build_block = False
+    pkl_dir = '/home/aiscuser/scratch1/datasets/'
+    data_dir = '/data/datasets/'
     
-    output_dir = '/home/scai/phd/aiz218323/scratch/outputs/mogic/03_benchmarking_nvembed_bm25'
+    output_dir = '/home/aiscuser/scratch1/outputs/mogic/03_nvembed-oracle-for-wikiseealsotitles-003'
 
     """ Load data """
     pkl_file = f'{pkl_dir}/processed/wikiseealsotitles_data_nv-embed-v2_xcs.pkl'
@@ -37,9 +42,9 @@ if __name__ == '__main__':
     if build_block:
         block = XCBlock.from_cfg(data_dir, 'data', transform_type='xcs', tokenizer='nvidia/NV-Embed-v2', 
                                  sampling_features=[('lbl2data',1)], max_sequence_length=64, oversample=False)
-        
+
         tokenizer = AutoTokenizer.from_pretrained('nvidia/NV-Embed-v2')
-        
+
         input_text = [prompt_func(o) for o in block.train.dset.data.data_info['input_text']]
         tokenized_text = tokenizer.batch_encode_plus(input_text, truncation=True, max_length=64)
         block.train.dset.data.data_info.update(tokenized_text)
@@ -52,14 +57,13 @@ if __name__ == '__main__':
         exit()
     else:
         with open(pkl_file, 'rb') as file: block = pickle.load(file)
-    
 
     """ Training arguements """
     args = XCLearningArguments(
         output_dir=output_dir,
         logging_first_step=True,
-        per_device_train_batch_size=800,
-        per_device_eval_batch_size=800,
+        per_device_train_batch_size=50,
+        per_device_eval_batch_size=50,
         representation_num_beams=200,
         representation_accumulation_steps=10,
         save_strategy="steps",
@@ -99,7 +103,10 @@ if __name__ == '__main__':
         use_distributional_representation=False,
         use_encoder_parallel=True,
         max_grad_norm=None, 
-        fp16=True,
+
+        fp16=False,
+        bf16=True,
+        optim="adamw_8bit",
         
         label_names=['lbl2data_idx', 'lbl2data_input_ids', 'lbl2data_attention_mask'],
     
@@ -110,26 +117,45 @@ if __name__ == '__main__':
         use_cpu_for_clustering=True,
     )
 
+    # bnb_config = BitsAndBytesConfig(
+    #     load_in_4bit=True,
+    #     bnb_4bit_use_double_quant=True,
+    #     bnb_4bit_quant_type="nf4",
+    #     bnb_4bit_compute_dtype=torch.bfloat16
+    # )
+    bnb_config = BitsAndBytesConfig(load_in_8bit=True)
+
     """ model """
     bsz = max(args.per_device_train_batch_size, args.per_device_eval_batch_size)*torch.cuda.device_count()
     model = NVM009.from_pretrained('nvidia/NV-Embed-v2', bsz=bsz, margin=0.3, tau=0.1, n_negatives=10, apply_softmax=True, 
-                                   use_encoder_parallel=False)
-    
-    model.init_dr_head()
+                                   use_encoder_parallel=True, quantization_config=bnb_config)
+    # model.init_dr_head()
+
+    lora_config = LoraConfig(
+        r=32,
+        lora_alpha=64,
+        lora_dropout=0.05,
+        target_modules=["q_proj", "k_proj","v_proj","o_proj"],
+        bias='none',
+    )
+    m = get_peft_model(model, lora_config)
+
+    # model.gradient_checkpointing_enable()
+    m = prepare_model_for_kbit_training(m)
+
     
     """ Training """
     metric = PrecRecl(block.n_lbl, block.test.data_lbl_filterer, prop=block.train.dset.data.data_lbl,
                       pk=10, rk=200, rep_pk=[1, 3, 5, 10], rep_rk=[10, 100, 200])
 
     learn = XCLearner(
-        model=model, 
+        model=m, 
         args=args,
         train_dataset=block.train.dset,
         eval_dataset=block.test.dset,
         data_collator=block.collator,
         compute_metrics=metric,
     )
-    
-    mp.freeze_support()
+
     learn.train()
-    
+    # print(learn.evaluate())

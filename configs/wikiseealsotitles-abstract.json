@@ -1,0 +1,102 @@
+{
+    "data_meta": {
+        "path": {
+            "train": {
+                "data_lbl": "/data/datasets//(mapped)LF-WikiSeeAlsoTitles-320K/trn_X_Y.txt",
+                "data_info": "/home/aiscuser/scratch1/datasets//LF-WikiSeeAlsoTitles-320K/raw_data/train_abstract.raw.txt",
+                "lbl_info": "/home/aiscuser/scratch1/datasets//LF-WikiSeeAlsoTitles-320K/raw_data/label_abstract.raw.txt",
+                "data_lbl_filterer": "/data/datasets//(mapped)LF-WikiSeeAlsoTitles-320K/filter_labels_train.txt",
+                "hab_meta": {
+                    "prefix": "hab",
+                    "data_meta": "/data/datasets//(mapped)LF-WikiSeeAlsoTitles-320K/hyper_link_trn_X_Y.txt",
+                    "lbl_meta": "/data/datasets//(mapped)LF-WikiSeeAlsoTitles-320K/hyper_link_lbl_X_Y.txt",
+                    "meta_info": "/home/aiscuser/scratch1/datasets//LF-WikiSeeAlsoTitles-320K/raw_data/hyper_link_abstract.raw.txt"
+                }
+            },
+            "test": {
+                "data_lbl": "/data/datasets//(mapped)LF-WikiSeeAlsoTitles-320K/tst_X_Y.txt",
+                "data_info": "/home/aiscuser/scratch1/datasets//LF-WikiSeeAlsoTitles-320K/raw_data/test_abstract.raw.txt",
+                "lbl_info": "/home/aiscuser/scratch1/datasets//LF-WikiSeeAlsoTitles-320K/raw_data/label_abstract.raw.txt",
+                "data_lbl_filterer": "/data/datasets//(mapped)LF-WikiSeeAlsoTitles-320K/filter_labels_test.txt",
+                "hab_meta": {
+                    "prefix": "hab",
+                    "data_meta": "/data/datasets//(mapped)LF-WikiSeeAlsoTitles-320K/hyper_link_tst_X_Y.txt",
+                    "lbl_meta": "/data/datasets//(mapped)LF-WikiSeeAlsoTitles-320K/hyper_link_lbl_X_Y.txt",
+                    "meta_info": "/home/aiscuser/scratch1/datasets//LF-WikiSeeAlsoTitles-320K/raw_data/hyper_link_abstract.raw.txt"
+                }
+            }
+        },
+        "parameters": {
+            "transform_type": "xc",
+            "smp_features": [
+                [
+                    "lbl2data",
+                    1,
+                    2
+                ],
+                [
+                    "hlk2data",
+                    1,
+                    1
+                ],
+                [
+                    "hlk2lbl2data",
+                    2,
+                    1
+                ]
+            ],
+            "pad_token": 0,
+            "oversample": false,
+            "sampling_features": [
+                [
+                    "lbl2data",
+                    2
+                ],
+                [
+                    "hlk2data",
+                    1
+                ],
+                [
+                    "hlk2lbl2data",
+                    1
+                ]
+            ],
+            "num_labels": 1,
+            "num_metadata": 1,
+            "metadata_name": null,
+            "info_column_names": [
+                "identifier",
+                "input_text"
+            ],
+            "use_tokenizer": true,
+            "tokenizer": "distilbert-base-cased",
+            "tokenization_column": "input_text",
+            "main_max_sequence_length": 64,
+            "meta_max_sequence_length": 64,
+            "padding": false,
+            "return_tensors": null,
+            "sep": "->",
+            "prompt_func": null,
+            "pad_side": "right",
+            "drop": true,
+            "ret_t": true,
+            "in_place": true,
+            "collapse": true,
+            "device": "cpu",
+            "inp": "data",
+            "targ": "lbl2data",
+            "ptr": "lbl2data_data2ptr",
+            "n_lbl_samples": null,
+            "data_info_keys": null,
+            "lbl_info_keys": null,
+            "n_slbl_samples": 1,
+            "main_oversample": false,
+            "n_data_meta_samples": null,
+            "n_lbl_meta_samples": null,
+            "meta_info_keys": null,
+            "n_sdata_meta_samples": 1,
+            "n_slbl_meta_samples": 1,
+            "meta_oversample": false
+        }
+    }
+}

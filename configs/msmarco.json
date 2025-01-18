@@ -1,0 +1,88 @@
+{
+    "data": {
+        "path": {
+            "train": {
+                "data_lbl": "/data/datasets/MSMarco/XC/trn_X_Y.npz",
+                "data_info": "/data/datasets/MSMarco/XC/raw_data/train.raw.txt",
+                "lbl_info": "/data/datasets/MSMarco/XC/raw_data/label.raw.txt"
+            },
+            "test": {
+                "data_lbl": "/data/datasets/MSMarco/XC/val_X_Y.npz",
+                "data_info": "/data/datasets/MSMarco/XC/raw_data/valid.raw.txt",
+                "lbl_info": "/data/datasets/MSMarco/XC/raw_data/label.raw.txt"
+            }
+        },
+        "parameters": {
+            "transform_type": "xc",
+            "smp_features": [
+                [
+                    "lbl2data",
+                    1,
+                    2
+                ],
+                [
+                    "hlk2data",
+                    1,
+                    1
+                ],
+                [
+                    "hlk2lbl2data",
+                    2,
+                    1
+                ]
+            ],
+            "pad_token": 0,
+            "oversample": false,
+            "sampling_features": [
+                [
+                    "lbl2data",
+                    2
+                ],
+                [
+                    "hlk2data",
+                    1
+                ],
+                [
+                    "hlk2lbl2data",
+                    1
+                ]
+            ],
+            "num_labels": 1,
+            "num_metadata": 1,
+            "metadata_name": null,
+            "info_column_names": [
+                "identifier",
+                "input_text"
+            ],
+            "use_tokenizer": true,
+            "tokenizer": "distilbert-base-cased",
+            "tokenization_column": "input_text",
+            "main_max_sequence_length": 32,
+            "meta_max_sequence_length": 32,
+            "padding": false,
+            "return_tensors": null,
+            "sep": "->",
+            "prompt_func": null,
+            "pad_side": "right",
+            "drop": true,
+            "ret_t": true,
+            "in_place": true,
+            "collapse": true,
+            "device": "cpu",
+            "inp": "data",
+            "targ": "lbl2data",
+            "ptr": "lbl2data_data2ptr",
+            "n_lbl_samples": null,
+            "data_info_keys": null,
+            "lbl_info_keys": null,
+            "n_slbl_samples": 1,
+            "main_oversample": false,
+            "n_data_meta_samples": null,
+            "n_lbl_meta_samples": null,
+            "meta_info_keys": null,
+            "n_sdata_meta_samples": 1,
+            "n_slbl_meta_samples": 1,
+            "meta_oversample": false
+        }
+    }
+}

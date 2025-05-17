@@ -16,9 +16,9 @@ os.environ['WANDB_PROJECT']='mogic_01-msmarco'
 if __name__ == '__main__':
     parse_args = parse_args()
 
-    output_dir = '/home/aiscuser/scratch1/outputs/mogic/17_ngame-for-msmarco-001'
+    output_dir = '/home/aiscuser/scratch1/outputs/mogic/17_ngame-for-msmarco-from-scratch-001'
     config_file, config_key = 'configs/msmarco.json', 'data'
-    mname = 'sentence-transformers/msmarco-distilbert-base-v4'
+    mname = 'distilbert-base-uncased'
 
     do_inference = parse_args.do_train_inference or parse_args.do_test_inference or parse_args.save_train_inference \
             or parse_args.save_test_inference or parse_args.save_repr
@@ -42,8 +42,8 @@ if __name__ == '__main__':
             representation_accumulation_steps=10,
             save_strategy="steps",
             evaluation_strategy="steps",
-            eval_steps=10,
-            save_steps=10,
+            eval_steps=5000,
+            save_steps=5000,
             save_total_limit=5,
             num_train_epochs=300,
             predict_with_representation=True,
@@ -83,8 +83,7 @@ if __name__ == '__main__':
             return model
 
         bsz = max(args.per_device_train_batch_size, args.per_device_eval_batch_size)*torch.cuda.device_count()
-        model = main_load_model(args.output_dir, load_model, {"mname": "sentence-transformers/msmarco-distilbert-base-v4", "bsz": bsz},
-                init_model, do_inference=do_inference)
+        model = main_load_model(args.output_dir, load_model, {"mname": mname, "bsz": bsz}, init_model, do_inference=do_inference)
 
         learn = XCLearner(
             model=model, 
